@@ -7,18 +7,26 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func newRouter() http.Handler {
+// maxRequestBody is the maximum allowed size for incoming request bodies (1 MB).
+const maxRequestBody = 1 << 20
+
+func newRouter(svc *Service) http.Handler {
 	r := chi.NewRouter()
-	r.Get("/status", handleStatus)
-	r.Post("/run", handleRun)
-	r.Get("/logs", handleLogs)
-	r.Get("/config", handleConfig)
+	h := &handler{svc: svc}
+	r.Get("/status", h.handleStatus)
+	r.Post("/run", h.handleRun)
+	r.Get("/logs", h.handleLogs)
+	r.Get("/config", h.handleConfig)
 	return r
 }
 
-func handleStatus(w http.ResponseWriter, r *http.Request) {
-	svc := &Service{}
-	updates, err := svc.ListPendingUpdates()
+// handler groups HTTP handlers with a shared Service instance.
+type handler struct {
+	svc *Service
+}
+
+func (h *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
+	updates, err := h.svc.ListPendingUpdates()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list updates", err.Error())
 		return
@@ -26,7 +34,8 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, updates)
 }
 
-func handleRun(w http.ResponseWriter, r *http.Request) {
+func (h *handler) handleRun(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
 	var req struct {
 		Type string `json:"type"`
 	}
@@ -35,13 +44,17 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc := &Service{}
+	if req.Type == "" {
+		writeError(w, http.StatusBadRequest, "missing update type", "type must be 'security' or 'full'")
+		return
+	}
+
 	var err error
 	switch req.Type {
 	case "security":
-		err = svc.RunSecurityUpdates()
+		err = h.svc.RunSecurityUpdates()
 	case "full":
-		err = svc.RunFullUpgrade()
+		err = h.svc.RunFullUpgrade()
 	default:
 		writeError(w, http.StatusBadRequest, "invalid update type", "type must be 'security' or 'full'")
 		return
@@ -53,9 +66,8 @@ func handleRun(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, map[string]string{"status": "started", "type": req.Type})
 }
 
-func handleLogs(w http.ResponseWriter, r *http.Request) {
-	svc := &Service{}
-	status, err := svc.GetLastRunStatus()
+func (h *handler) handleLogs(w http.ResponseWriter, r *http.Request) {
+	status, err := h.svc.GetLastRunStatus()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to get logs", err.Error())
 		return
@@ -63,7 +75,7 @@ func handleLogs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, status)
 }
 
-func handleConfig(w http.ResponseWriter, _ *http.Request) {
+func (h *handler) handleConfig(w http.ResponseWriter, _ *http.Request) {
 	cfg := map[string]any{
 		"auto_security_updates": true,
 		"schedule":              "0 3 * * *",

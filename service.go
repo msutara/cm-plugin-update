@@ -12,12 +12,12 @@ type PendingUpdate struct {
 
 // RunStatus represents the outcome of the last update run.
 type RunStatus struct {
-	Type      string    `json:"type"`
-	Status    string    `json:"status"`
-	StartedAt time.Time `json:"started_at"`
-	Duration  string    `json:"duration"`
-	Packages  int       `json:"packages"`
-	Log       string    `json:"log"`
+	Type      string     `json:"type"`
+	Status    string     `json:"status"`
+	StartedAt *time.Time `json:"started_at,omitempty"`
+	Duration  string     `json:"duration"`
+	Packages  int        `json:"packages"`
+	Log       string     `json:"log"`
 }
 
 // Service contains the domain logic for update management.
