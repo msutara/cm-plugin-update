@@ -3,16 +3,15 @@ package update
 import (
 	"net/http"
 
-	"github.com/msutara/config-manager-core/internal/plugin"
+	"github.com/msutara/cm-plugin-update/pluginiface"
 )
 
-// UpdatePlugin implements the plugin.Plugin interface for OS and package
+// Compile-time check: UpdatePlugin implements pluginiface.Plugin.
+var _ pluginiface.Plugin = (*UpdatePlugin)(nil)
+
+// UpdatePlugin implements the pluginiface.Plugin interface for OS and package
 // update management on Debian-based nodes.
 type UpdatePlugin struct{}
-
-func init() {
-	plugin.Register(&UpdatePlugin{})
-}
 
 func (p *UpdatePlugin) Name() string        { return "update" }
 func (p *UpdatePlugin) Version() string     { return "0.1.0" }
@@ -22,9 +21,9 @@ func (p *UpdatePlugin) Routes() http.Handler {
 	return newRouter()
 }
 
-func (p *UpdatePlugin) ScheduledJobs() []plugin.JobDefinition {
+func (p *UpdatePlugin) ScheduledJobs() []pluginiface.JobDefinition {
 	svc := &Service{}
-	return []plugin.JobDefinition{
+	return []pluginiface.JobDefinition{
 		{
 			ID:          "update.security",
 			Description: "Run automatic security updates",
