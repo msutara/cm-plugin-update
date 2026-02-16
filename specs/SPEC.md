@@ -20,11 +20,11 @@ updates without interactive access.
 
 ## Integration
 
-- Implements the `Plugin` interface from
-  `github.com/msutara/config-manager-core/internal/plugin`.
-- Self-registers via `plugin.Register()` in an `init()` function.
-- Imported in the core binary with a blank import:
-  `import _ "github.com/msutara/cm-plugin-update"`
+- Implements the local `pluginiface.Plugin` interface used by this repository.
+- Does **not** call `plugin.Register()` in `init()`; registration is performed
+  explicitly by the core integration layer when constructing the plugin.
+- Included in the core binary via the normal dependency graph; the core wiring
+  code instantiates and registers the plugin.
 - Routes are mounted by the core API server under
   `/api/v1/plugins/update`.
 

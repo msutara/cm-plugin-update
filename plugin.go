@@ -9,7 +9,6 @@ import (
 // Compile-time check: UpdatePlugin implements pluginiface.Plugin.
 var _ pluginiface.Plugin = (*UpdatePlugin)(nil)
 
-// Compile-time check: NewUpdatePlugin returns an implementation of pluginiface.Plugin.
 // Note: The specification (specs/SPEC.md) describes self-registration via
 // plugin.Register() in an init() function. That call is intentionally omitted
 // here because pluginiface is a local mirror of the core interface for

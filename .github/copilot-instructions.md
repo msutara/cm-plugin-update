@@ -12,7 +12,7 @@ Target platforms: Raspbian Bookworm (ARM64), Debian Bullseye slim.
 ## Architecture
 
 - **plugin.go** — `UpdatePlugin` struct implementing the `plugin.Plugin`
-  interface; self-registers via `init()`.
+  interface; registration is handled by the core (no `init()` self-registration).
 - **routes.go** — Chi router with handlers for `/status`, `/run`, `/logs`,
   `/config`. Mounted by the core under `/api/v1/plugins/update`.
 - **service.go** — Domain logic: `ListPendingUpdates`, `RunSecurityUpdates`,
@@ -27,8 +27,8 @@ import _ "github.com/msutara/cm-plugin-update"
 
 ## Conventions
 
-- Single Go package (`package update`) at the repo root — no `internal/` needed
-  since everything is consumed via the blank import.
+- Main Go package is `package update` at the repo root; additional helper
+  packages (e.g., `pluginiface`) are allowed.
 - Use `github.com/go-chi/chi/v5` for HTTP routing.
 - Use `log/slog` for all structured logging (include `plugin=update`).
 - Error responses use the core format:

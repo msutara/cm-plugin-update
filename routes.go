@@ -2,6 +2,8 @@ package update
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -40,6 +42,10 @@ func (h *handler) handleRun(w http.ResponseWriter, r *http.Request) {
 		Type string `json:"type"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if errors.Is(err, io.EOF) {
+			writeError(w, http.StatusBadRequest, "missing update type", "type must be 'security' or 'full'")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid request body", err.Error())
 		return
 	}
