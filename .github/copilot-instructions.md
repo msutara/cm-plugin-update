@@ -18,11 +18,14 @@ Target platforms: Raspbian Bookworm (ARM64), Debian Bullseye slim.
 - **service.go** — Domain logic: `ListPendingUpdates`, `RunSecurityUpdates`,
   `RunFullUpgrade`, `GetLastRunStatus`.
 
-The plugin is compiled into the core binary via a blank import in
-`cmd/cm/main.go`:
+The plugin is integrated into the core binary via a normal import in
+`cmd/cm/main.go`, where the core constructs and registers the plugin
+explicitly:
 
 ```go
-import _ "github.com/msutara/cm-plugin-update"
+import update "github.com/msutara/cm-plugin-update"
+
+plugin.Register(update.NewUpdatePlugin())
 ```
 
 ## Conventions
