@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -44,6 +45,11 @@ func (h *handler) handleRun(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		if errors.Is(err, io.EOF) {
 			writeError(w, http.StatusBadRequest, "missing update type", "type must be 'security' or 'full'")
+			return
+		}
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "request body too large", err.Error())
 			return
 		}
 		writeError(w, http.StatusBadRequest, "invalid request body", err.Error())
@@ -92,17 +98,21 @@ func (h *handler) handleConfig(w http.ResponseWriter, _ *http.Request) {
 func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(v) //nolint:errcheck
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		slog.Error("failed to write JSON response", "error", err)
+	}
 }
 
 func writeError(w http.ResponseWriter, code int, message, details string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"error": map[string]any{
 			"code":    code,
 			"message": message,
 			"details": details,
 		},
-	})
+	}); err != nil {
+		slog.Error("failed to write error response", "error", err)
+	}
 }
