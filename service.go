@@ -149,7 +149,12 @@ func (s *Service) runAptCommand(runType string, args ...string) error {
 	s.lastRun = status
 
 	if err != nil {
-		return fmt.Errorf("%s failed: %w", runType, err)
+		// Include truncated output in error for better diagnostics.
+		detail := string(out)
+		if len(detail) > 500 {
+			detail = detail[len(detail)-500:]
+		}
+		return fmt.Errorf("%s failed: %w: %s", runType, err, detail)
 	}
 	return nil
 }
@@ -199,6 +204,7 @@ func (s *Service) RunFullUpgrade() error {
 }
 
 // GetLastRunStatus returns the outcome of the most recent update run.
+// Returns a defensive copy so callers cannot mutate internal state.
 func (s *Service) GetLastRunStatus() (*RunStatus, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -208,5 +214,11 @@ func (s *Service) GetLastRunStatus() (*RunStatus, error) {
 			Status: "none",
 		}, nil
 	}
-	return s.lastRun, nil
+
+	cp := *s.lastRun
+	if s.lastRun.StartedAt != nil {
+		t := *s.lastRun.StartedAt
+		cp.StartedAt = &t
+	}
+	return &cp, nil
 }
