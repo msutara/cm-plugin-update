@@ -43,7 +43,7 @@ var errAptNotAvailable = errors.New("apt not available on this platform")
 //
 //	package/source version_new arch [upgradable from: version_old]
 func parsePendingUpdates(output string) []PendingUpdate {
-	var updates []PendingUpdate
+	updates := make([]PendingUpdate, 0)
 	for _, line := range strings.Split(output, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "Listing") {
@@ -198,6 +198,9 @@ func distroCodename() (string, error) {
 
 // RunFullUpgrade applies all pending package upgrades.
 func (s *Service) RunFullUpgrade() error {
+	if runtime.GOOS != "linux" {
+		return errAptNotAvailable
+	}
 	return s.runAptCommand("full",
 		"-y", "-o", "Dpkg::Options::=--force-confold", "dist-upgrade",
 	)
