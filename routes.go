@@ -75,7 +75,7 @@ func (h *handler) handleRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "update failed", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]string{"status": "started", "type": req.Type})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "completed", "type": req.Type})
 }
 
 func (h *handler) handleLogs(w http.ResponseWriter, r *http.Request) {

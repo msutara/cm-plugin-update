@@ -26,9 +26,17 @@ func NewUpdatePlugin() *UpdatePlugin {
 	return &UpdatePlugin{svc: &Service{}}
 }
 
-func (p *UpdatePlugin) Name() string        { return "update" }
-func (p *UpdatePlugin) Version() string     { return "0.1.0" }
-func (p *UpdatePlugin) Description() string { return "OS and package update management" }
+func (p *UpdatePlugin) Name() string {
+	return "update"
+}
+
+func (p *UpdatePlugin) Version() string {
+	return "0.1.0"
+}
+
+func (p *UpdatePlugin) Description() string {
+	return "OS and package update management"
+}
 
 func (p *UpdatePlugin) Routes() http.Handler {
 	return newRouter(p.svc)
