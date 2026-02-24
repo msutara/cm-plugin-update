@@ -6,7 +6,9 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -36,14 +38,17 @@ type Service struct {
 	lastRun *RunStatus
 }
 
-var errAptNotAvailable = errors.New("apt not available on this platform")
+var (
+	errNotLinux    = errors.New("update plugin requires Linux")
+	errAptNotFound = errors.New("apt-get not found in PATH")
+)
 
 // parsePendingUpdates parses the output of `apt list --upgradable` into
 // PendingUpdate structs. Each output line has the form:
 //
 //	package/source version_new arch [upgradable from: version_old]
 func parsePendingUpdates(output string) []PendingUpdate {
-	var updates []PendingUpdate
+	updates := make([]PendingUpdate, 0)
 	for _, line := range strings.Split(output, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "Listing") {
@@ -109,15 +114,32 @@ func (s *Service) ListPendingUpdates() ([]PendingUpdate, error) {
 	return updates, nil
 }
 
+// upgradeCountRe matches the apt-get summary line:
+//
+//	"N upgraded, M newly installed, P to remove and Q not upgraded."
+var upgradeCountRe = regexp.MustCompile(`(\d+)\s+upgraded,\s*(\d+)\s+newly installed`)
+
+// parseUpgradedCount extracts the total number of upgraded + newly installed
+// packages from apt-get combined output.
+func parseUpgradedCount(output string) int {
+	m := upgradeCountRe.FindStringSubmatch(output)
+	if m == nil {
+		return 0
+	}
+	upgraded, _ := strconv.Atoi(m[1])
+	installed, _ := strconv.Atoi(m[2])
+	return upgraded + installed
+}
+
 // runAptCommand executes an apt-get command and records the result in lastRun.
 func (s *Service) runAptCommand(runType string, args ...string) error {
 	if runtime.GOOS != "linux" {
-		return errAptNotAvailable
+		return errNotLinux
 	}
 
 	aptGetPath, err := exec.LookPath("apt-get")
 	if err != nil {
-		return errAptNotAvailable
+		return errAptNotFound
 	}
 
 	s.mu.Lock()
@@ -136,6 +158,7 @@ func (s *Service) runAptCommand(runType string, args ...string) error {
 		Status:    "success",
 		StartedAt: &start,
 		Duration:  duration.Round(time.Millisecond).String(),
+		Packages:  parseUpgradedCount(string(out)),
 		Log:       string(out),
 	}
 
@@ -163,7 +186,7 @@ func (s *Service) runAptCommand(runType string, args ...string) error {
 // the apt target release to the distribution's security pocket.
 func (s *Service) RunSecurityUpdates() error {
 	if runtime.GOOS != "linux" {
-		return errAptNotAvailable
+		return errNotLinux
 	}
 
 	codename, err := distroCodename()
@@ -198,6 +221,9 @@ func distroCodename() (string, error) {
 
 // RunFullUpgrade applies all pending package upgrades.
 func (s *Service) RunFullUpgrade() error {
+	if runtime.GOOS != "linux" {
+		return errNotLinux
+	}
 	return s.runAptCommand("full",
 		"-y", "-o", "Dpkg::Options::=--force-confold", "dist-upgrade",
 	)
