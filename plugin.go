@@ -9,11 +9,9 @@ import (
 // Compile-time check: UpdatePlugin implements pluginiface.Plugin.
 var _ pluginiface.Plugin = (*UpdatePlugin)(nil)
 
-// Note: The specification (specs/SPEC.md) describes self-registration via
-// plugin.Register() in an init() function. That call is intentionally omitted
-// here because pluginiface is a local mirror of the core interface for
-// independent development. Registration will be wired when integrating with
-// config-manager-core.
+// Note: Registration with the core is handled externally — the core's main.go
+// calls plugin.Register(update.NewUpdatePlugin()). This plugin uses a local
+// pluginiface mirror of the core interface for independent development.
 
 // UpdatePlugin implements the pluginiface.Plugin interface for OS and package
 // update management on Debian-based nodes.

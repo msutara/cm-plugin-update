@@ -33,4 +33,4 @@ CI runs automatically on push/PR to `main` via GitHub Actions
 
 ## License
 
-See [LICENSE](LICENSE) for details.
+License not yet finalized.

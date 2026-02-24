@@ -1,12 +1,12 @@
 # Update Plugin Specification
 
-## Purpose
+## 1. Purpose
 
 OS and package update management for headless Debian-based nodes. This plugin
 provides a safe, remotely-controllable way to list, apply, and schedule system
 updates without interactive access.
 
-## Responsibilities
+## 2. Responsibilities
 
 - **List pending updates** — query `apt` for available package upgrades and
   report counts, package names, and severity levels.
@@ -15,10 +15,17 @@ updates without interactive access.
 - **Run full upgrades** — apply all pending upgrades (`apt-get dist-upgrade`).
 - **View last run status/logs** — persist the outcome (success/failure, start
   time, duration, packages affected) so it can be queried later.
-- **Schedule automatic updates** — expose a cron-driven job that the core
-  scheduler can trigger on a configurable cadence.
+- **Schedule automatic updates** — expose a cron-driven job (`0 3 * * *` by
+  default) that the core scheduler triggers automatically.
 
-## Integration
+## 3. Non-responsibilities
+
+- No `apt-key` management or GPG key handling
+- No PPA or third-party repository management
+- No rollback of applied updates
+- No kernel live-patching or reboot orchestration
+
+## 4. Integration
 
 - Implements the local `pluginiface.Plugin` interface used by this repository.
 - Does **not** call `plugin.Register()` in `init()`; registration is performed
@@ -27,8 +34,9 @@ updates without interactive access.
   code instantiates and registers the plugin.
 - Routes are mounted by the core API server under
   `/api/v1/plugins/update`.
+- Scheduled jobs are registered with the core scheduler at startup.
 
-## API Routes
+## 5. API Routes
 
 All routes are relative to the plugin mount point (`/api/v1/plugins/update`).
 
@@ -62,3 +70,14 @@ Errors follow the core convention:
   }
 }
 ```
+
+## 6. Scheduled Jobs
+
+| Job ID            | Schedule      | Description                    |
+|-------------------|---------------|--------------------------------|
+| update.security   | `0 3 * * *`  | Run automatic security updates |
+
+## 7. Configuration
+
+The plugin currently has no plugin-specific configuration. All behaviour is
+controlled via the API endpoints and the core scheduler.
