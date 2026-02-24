@@ -79,5 +79,14 @@ Errors follow the core convention:
 
 ## 7. Configuration
 
-The plugin currently has no plugin-specific configuration. All behaviour is
-controlled via the API endpoints and the core scheduler.
+The plugin exposes a read-only configuration view via `GET /config`:
+
+```json
+{
+  "auto_security_updates": true,
+  "schedule": "0 3 * * *"
+}
+```
+
+These are plugin-defined, read-only defaults. All behaviour is controlled via
+the API endpoints and the core scheduler.

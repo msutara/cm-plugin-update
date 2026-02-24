@@ -65,5 +65,14 @@ curl http://localhost:8080/api/v1/plugins/update/config
 
 ## 5. Configuration
 
-The plugin currently has no plugin-specific configuration. All behaviour is
-controlled via the API endpoints and the core scheduler.
+The plugin exposes a read-only configuration view via `GET /config`:
+
+```json
+{
+  "auto_security_updates": true,
+  "schedule": "0 3 * * *"
+}
+```
+
+These are plugin-defined, read-only defaults; they are not directly
+user-configurable.
