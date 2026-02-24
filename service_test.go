@@ -4,6 +4,7 @@ import (
 	"errors"
 	"runtime"
 	"testing"
+	"time"
 )
 
 func TestParsePendingUpdates_Typical(t *testing.T) {
@@ -178,5 +179,100 @@ func TestParsePendingUpdates_ReturnsEmptySliceNotNil(t *testing.T) {
 	updates := parsePendingUpdates("")
 	if updates == nil {
 		t.Fatal("expected non-nil empty slice, got nil")
+	}
+}
+
+func TestGetLastRunStatus_DefensiveCopy(t *testing.T) {
+	svc := &Service{}
+	now := time.Now()
+	svc.lastRun = &RunStatus{
+		Type:      "security",
+		Status:    "success",
+		StartedAt: &now,
+		Duration:  "1.5s",
+		Packages:  3,
+		Log:       "test log",
+	}
+
+	s1, err := svc.GetLastRunStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Mutate the returned copy
+	s1.Status = "mutated"
+	s1.Packages = 999
+	*s1.StartedAt = time.Time{}
+
+	// Original must be unchanged
+	s2, err := svc.GetLastRunStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if s2.Status != "success" {
+		t.Errorf("status mutated: got %q, want %q", s2.Status, "success")
+	}
+	if s2.Packages != 3 {
+		t.Errorf("packages mutated: got %d, want %d", s2.Packages, 3)
+	}
+	if s2.StartedAt.IsZero() {
+		t.Error("startedAt mutated to zero")
+	}
+}
+
+func TestListPendingUpdates_NonLinux(t *testing.T) {
+	if runtime.GOOS == "linux" {
+		t.Skip("skipping non-Linux test on Linux")
+	}
+	svc := &Service{}
+	updates, err := svc.ListPendingUpdates()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if updates == nil {
+		t.Fatal("expected non-nil empty slice on non-Linux")
+	}
+	if len(updates) != 0 {
+		t.Fatalf("expected 0 updates on non-Linux, got %d", len(updates))
+	}
+}
+
+func TestRunAptCommand_NonLinux(t *testing.T) {
+	if runtime.GOOS == "linux" {
+		t.Skip("skipping non-Linux test on Linux")
+	}
+	svc := &Service{}
+	err := svc.runAptCommand("test", "version")
+	if !errors.Is(err, errNotLinux) {
+		t.Fatalf("got %v, want errNotLinux", err)
+	}
+}
+
+func TestParsePendingUpdates_MultipleSecuritySources(t *testing.T) {
+	output := `Listing... Done
+openssl/bookworm-security 3.0.11-1 amd64 [upgradable from: 3.0.9-1]
+git/bookworm 1:2.39.5-0+deb12u1 amd64 [upgradable from: 1:2.39.2-1.1]
+zlib1g/bookworm-security 1:1.2.13.dfsg-1 amd64 [upgradable from: 1:1.2.13-1]
+`
+	updates := parsePendingUpdates(output)
+	if len(updates) != 3 {
+		t.Fatalf("expected 3 updates, got %d", len(updates))
+	}
+
+	securityCount := 0
+	for _, u := range updates {
+		if u.Security {
+			securityCount++
+		}
+	}
+	if securityCount != 2 {
+		t.Errorf("expected 2 security updates, got %d", securityCount)
+	}
+}
+
+func TestParseUpgradedCount_LargeNumbers(t *testing.T) {
+	got := parseUpgradedCount("125 upgraded, 13 newly installed, 2 to remove and 0 not upgraded.")
+	if got != 138 {
+		t.Errorf("got %d, want 138", got)
 	}
 }
