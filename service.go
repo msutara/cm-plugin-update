@@ -126,8 +126,14 @@ func parseUpgradedCount(output string) int {
 	if m == nil {
 		return 0
 	}
-	upgraded, _ := strconv.Atoi(m[1])
-	installed, _ := strconv.Atoi(m[2])
+	upgraded, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0
+	}
+	installed, err := strconv.Atoi(m[2])
+	if err != nil {
+		return upgraded
+	}
 	return upgraded + installed
 }
 
