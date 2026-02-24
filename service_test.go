@@ -121,8 +121,8 @@ func TestRunSecurityUpdates_NonLinux(t *testing.T) {
 	}
 	svc := &Service{}
 	err := svc.RunSecurityUpdates()
-	if !errors.Is(err, errAptNotAvailable) {
-		t.Fatalf("got %v, want errAptNotAvailable", err)
+	if !errors.Is(err, errNotLinux) {
+		t.Fatalf("got %v, want errNotLinux", err)
 	}
 }
 
@@ -132,7 +132,51 @@ func TestRunFullUpgrade_NonLinux(t *testing.T) {
 	}
 	svc := &Service{}
 	err := svc.RunFullUpgrade()
-	if !errors.Is(err, errAptNotAvailable) {
-		t.Fatalf("got %v, want errAptNotAvailable", err)
+	if !errors.Is(err, errNotLinux) {
+		t.Fatalf("got %v, want errNotLinux", err)
+	}
+}
+
+func TestParseUpgradedCount(t *testing.T) {
+	cases := []struct {
+		name   string
+		output string
+		want   int
+	}{
+		{
+			"typical",
+			"5 upgraded, 2 newly installed, 0 to remove and 3 not upgraded.",
+			7,
+		},
+		{
+			"zero",
+			"0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.",
+			0,
+		},
+		{
+			"no match",
+			"Reading package lists... Done",
+			0,
+		},
+		{
+			"empty",
+			"",
+			0,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseUpgradedCount(tc.output)
+			if got != tc.want {
+				t.Errorf("got %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestParsePendingUpdates_ReturnsEmptySliceNotNil(t *testing.T) {
+	updates := parsePendingUpdates("")
+	if updates == nil {
+		t.Fatal("expected non-nil empty slice, got nil")
 	}
 }
