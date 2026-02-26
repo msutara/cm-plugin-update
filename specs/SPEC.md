@@ -27,7 +27,7 @@ updates without interactive access.
 
 ## 4. Integration
 
-- Implements the local `pluginiface.Plugin` interface used by this repository.
+- Implements the core `plugin.Plugin` interface from `config-manager-core`.
 - Does **not** call `plugin.Register()` in `init()`; registration is performed
   explicitly by the core integration layer when constructing the plugin.
 - Included in the core binary via the normal dependency graph; the core wiring

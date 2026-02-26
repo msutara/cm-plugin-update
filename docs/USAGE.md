@@ -18,8 +18,8 @@ import update "github.com/msutara/cm-plugin-update"
 plugin.Register(update.NewUpdatePlugin())
 ```
 
-> **Note:** In Phase 1, the plugin uses a local `pluginiface` package that
-> mirrors the core's `plugin.Plugin` interface for independent development.
+> **Note:** The plugin implements the `plugin.Plugin` interface from
+> `config-manager-core` directly.
 
 ## 3. API Endpoints
 

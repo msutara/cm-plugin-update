@@ -3,17 +3,16 @@ package update
 import (
 	"net/http"
 
-	"github.com/msutara/cm-plugin-update/pluginiface"
+	"github.com/msutara/config-manager-core/plugin"
 )
 
-// Compile-time check: UpdatePlugin implements pluginiface.Plugin.
-var _ pluginiface.Plugin = (*UpdatePlugin)(nil)
+// Compile-time check: UpdatePlugin implements plugin.Plugin.
+var _ plugin.Plugin = (*UpdatePlugin)(nil)
 
 // Note: Registration with the core is handled externally — the core's main.go
-// calls plugin.Register(update.NewUpdatePlugin()). This plugin uses a local
-// pluginiface mirror of the core interface for independent development.
+// calls plugin.Register(update.NewUpdatePlugin()).
 
-// UpdatePlugin implements the pluginiface.Plugin interface for OS and package
+// UpdatePlugin implements the plugin.Plugin interface for OS and package
 // update management on Debian-based nodes.
 type UpdatePlugin struct {
 	svc *Service
@@ -40,8 +39,8 @@ func (p *UpdatePlugin) Routes() http.Handler {
 	return newRouter(p.svc)
 }
 
-func (p *UpdatePlugin) ScheduledJobs() []pluginiface.JobDefinition {
-	return []pluginiface.JobDefinition{
+func (p *UpdatePlugin) ScheduledJobs() []plugin.JobDefinition {
+	return []plugin.JobDefinition{
 		{
 			ID:          "update.security",
 			Description: "Run automatic security updates",
