@@ -11,7 +11,7 @@ Target platforms: Raspbian Bookworm (ARM64), Debian Bullseye slim.
 
 ## Architecture
 
-- **plugin.go** — `UpdatePlugin` struct implementing `pluginiface.Plugin`;
+- **plugin.go** — `UpdatePlugin` struct implementing `plugin.Plugin` from `config-manager-core`;
   registration handled by the core (no `init()` self-registration)
 - **routes.go** — Chi router with handlers for `/status`, `/run`, `/logs`,
   `/config`; mounted by the core under `/api/v1/plugins/update`
@@ -34,7 +34,7 @@ Routes are mounted under `/api/v1/plugins/update`.
 ## Conventions
 
 - Main Go package is `package update` at the repo root
-- Additional helper packages (e.g., `pluginiface`) are allowed
+- Additional helper packages are allowed
 - Use `github.com/go-chi/chi/v5` for HTTP routing
 - Use `log/slog` for all structured logging (include `"plugin", "update"`)
 - Error responses: `{"error": {"code": ..., "message": ..., "details": ...}}`

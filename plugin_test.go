@@ -5,12 +5,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/msutara/cm-plugin-update/pluginiface"
+	"github.com/msutara/config-manager-core/plugin"
 )
 
 // Compile-time interface compliance (redundant with plugin.go but tests the
 // assertion independently).
-var _ pluginiface.Plugin = (*UpdatePlugin)(nil)
+var _ plugin.Plugin = (*UpdatePlugin)(nil)
 
 func TestNewUpdatePlugin(t *testing.T) {
 	p := NewUpdatePlugin()
