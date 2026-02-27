@@ -47,8 +47,8 @@ var (
 	// aptReleaseRe matches the suite (n=) or archive (a=) fields in
 	// apt-cache policy output.  The fields are comma-separated, e.g.:
 	//   release v=12,o=Debian,a=stable-security,n=bookworm-security,l=...
-	// The field may also be the first in the list (no leading comma).
-	aptReleaseRe = regexp.MustCompile(`(?:^|,)(?:n|a)=([^,]+)`)
+	// The field may also be the first after "release " (no leading comma).
+	aptReleaseRe = regexp.MustCompile(`(?:^|[,\s])(?:n|a)=([^,\s]+)`)
 )
 
 // Init probes the system once and caches whether a security-only apt

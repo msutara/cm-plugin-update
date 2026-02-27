@@ -330,8 +330,9 @@ func TestAptReleaseRe(t *testing.T) {
 		{"pi no bookworm-security", piOutput, "bookworm-security", false},
 		{"pi has bookworm", piOutput, "bookworm", true},
 		{"no partial match", debianOutput, "bookworm-sec", false},
-		{"field as first attr", "n=bookworm-security,o=Debian,a=stable", "bookworm-security", true},
-		{"archive as first attr", "a=stable-security,n=bookworm-security", "stable-security", true},
+		{"release prefix n first", "     release n=bookworm-security,o=Debian,a=stable", "bookworm-security", true},
+		{"release prefix a first", "     release a=stable-security,n=bookworm-security,l=Debian", "stable-security", true},
+		{"comma-separated mid-line", "v=12,o=Debian,n=bookworm-security,l=Debian", "bookworm-security", true},
 	}
 
 	for _, tc := range cases {

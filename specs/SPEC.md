@@ -77,6 +77,9 @@ Errors follow the core convention:
 |-------------------|---------------|--------------------------------|
 | update.security   | `0 3 * * *`  | Run automatic security updates |
 
+> The security job is only registered on systems with a separate security apt
+> source (e.g. Debian). On Raspberry Pi OS it is omitted.
+
 ## 7. Configuration
 
 The plugin exposes a read-only configuration view via `GET /config`:
@@ -84,9 +87,11 @@ The plugin exposes a read-only configuration view via `GET /config`:
 ```json
 {
   "auto_security_updates": true,
+  "security_available": true,
   "schedule": "0 3 * * *"
 }
 ```
 
-These are plugin-defined, read-only defaults. All behaviour is controlled via
-the API endpoints and the core scheduler.
+When the system lacks a separate security apt source, `security_available`
+and `auto_security_updates` are `false` and `schedule` is omitted.
+Behaviour is controlled via the API endpoints and the core scheduler.
