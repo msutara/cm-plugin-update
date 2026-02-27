@@ -236,7 +236,7 @@ func (s *Service) RunSecurityUpdates() error {
 	}
 
 	if !s.securityAvailable {
-		return fmt.Errorf("security-only updates unavailable on this system — use full upgrade instead")
+		return fmt.Errorf("security-only updates unavailable on this system -- use full upgrade instead")
 	}
 
 	codename, err := distroCodename()

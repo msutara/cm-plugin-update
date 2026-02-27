@@ -3,6 +3,7 @@ package update
 import (
 	"errors"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -124,6 +125,25 @@ func TestRunSecurityUpdates_NonLinux(t *testing.T) {
 	err := svc.RunSecurityUpdates()
 	if !errors.Is(err, errNotLinux) {
 		t.Fatalf("got %v, want errNotLinux", err)
+	}
+}
+
+func TestRunSecurityUpdates_Unavailable(t *testing.T) {
+	svc := &Service{securityAvailable: false}
+	err := svc.RunSecurityUpdates()
+	if runtime.GOOS != "linux" {
+		// On non-Linux, errNotLinux fires first.
+		if !errors.Is(err, errNotLinux) {
+			t.Fatalf("got %v, want errNotLinux", err)
+		}
+		return
+	}
+	if err == nil {
+		t.Fatal("expected error when security unavailable")
+	}
+	want := "security-only updates unavailable"
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("error %q should contain %q", err.Error(), want)
 	}
 }
 
