@@ -3,6 +3,7 @@ package update
 import (
 	"errors"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -124,6 +125,25 @@ func TestRunSecurityUpdates_NonLinux(t *testing.T) {
 	err := svc.RunSecurityUpdates()
 	if !errors.Is(err, errNotLinux) {
 		t.Fatalf("got %v, want errNotLinux", err)
+	}
+}
+
+func TestRunSecurityUpdates_Unavailable(t *testing.T) {
+	svc := &Service{securityAvailable: false}
+	err := svc.RunSecurityUpdates()
+	if runtime.GOOS != "linux" {
+		// On non-Linux, errNotLinux fires first.
+		if !errors.Is(err, errNotLinux) {
+			t.Fatalf("got %v, want errNotLinux", err)
+		}
+		return
+	}
+	if err == nil {
+		t.Fatal("expected error when security unavailable")
+	}
+	want := "security-only updates unavailable"
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("error %q should contain %q", err.Error(), want)
 	}
 }
 
@@ -274,5 +294,77 @@ func TestParseUpgradedCount_LargeNumbers(t *testing.T) {
 	got := parseUpgradedCount("125 upgraded, 13 newly installed, 2 to remove and 0 not upgraded.")
 	if got != 138 {
 		t.Errorf("got %d, want 138", got)
+	}
+}
+
+func TestAptReleaseRe(t *testing.T) {
+	// Real Debian apt-cache policy output snippet.
+	debianOutput := `Package files:
+ 100 /var/lib/dpkg/status
+     release a=now
+ 500 http://deb.debian.org/debian-security bookworm-security/main amd64 Packages
+     release v=12,o=Debian,a=stable-security,n=bookworm-security,l=Debian-Security,c=main,b=amd64
+ 500 http://deb.debian.org/debian bookworm/main amd64 Packages
+     release v=12,o=Debian,a=stable,n=bookworm,l=Debian,c=main,b=amd64
+`
+
+	// Raspberry Pi OS: no security pocket.
+	piOutput := `Package files:
+ 100 /var/lib/dpkg/status
+     release a=now
+ 500 http://raspbian.raspberrypi.com/raspbian bookworm/main armhf Packages
+     release o=Raspbian,a=stable,n=bookworm,l=Raspbian,c=main,b=armhf
+ 500 http://archive.raspberrypi.com/debian bookworm/main armhf Packages
+     release o=Raspberry Pi Foundation,a=stable,n=bookworm,l=Raspberry Pi Foundation,c=main,b=armhf
+`
+
+	cases := []struct {
+		name    string
+		output  string
+		release string
+		want    bool
+	}{
+		{"debian has bookworm-security", debianOutput, "bookworm-security", true},
+		{"debian has bookworm", debianOutput, "bookworm", true},
+		{"debian no bullseye", debianOutput, "bullseye-security", false},
+		{"pi no bookworm-security", piOutput, "bookworm-security", false},
+		{"pi has bookworm", piOutput, "bookworm", true},
+		{"no partial match", debianOutput, "bookworm-sec", false},
+		{"release prefix n first", "     release n=bookworm-security,o=Debian,a=stable", "bookworm-security", true},
+		{"release prefix a first", "     release a=stable-security,n=bookworm-security,l=Debian", "stable-security", true},
+		{"comma-separated mid-line", "v=12,o=Debian,n=bookworm-security,l=Debian", "bookworm-security", true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := false
+			for _, m := range aptReleaseRe.FindAllStringSubmatch(tc.output, -1) {
+				if m[1] == tc.release {
+					got = true
+					break
+				}
+			}
+			if got != tc.want {
+				t.Errorf("release %q: got %v, want %v", tc.release, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSecurityAvailable_DefaultFalse(t *testing.T) {
+	svc := &Service{}
+	if svc.SecurityAvailable() {
+		t.Error("expected SecurityAvailable()=false for zero-value Service")
+	}
+}
+
+func TestInit_NonLinux(t *testing.T) {
+	if runtime.GOOS == "linux" {
+		t.Skip("skipping non-Linux test on Linux")
+	}
+	svc := &Service{}
+	svc.Init()
+	if svc.SecurityAvailable() {
+		t.Error("expected SecurityAvailable()=false on non-Linux after Init")
 	}
 }

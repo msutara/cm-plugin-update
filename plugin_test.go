@@ -65,6 +65,16 @@ func TestUpdatePlugin_Routes(t *testing.T) {
 func TestUpdatePlugin_ScheduledJobs(t *testing.T) {
 	p := NewUpdatePlugin()
 	jobs := p.ScheduledJobs()
+
+	if !p.svc.SecurityAvailable() {
+		// On non-Linux or systems without a security apt source, the
+		// security cron job is omitted.
+		if len(jobs) != 0 {
+			t.Fatalf("ScheduledJobs: expected empty when security unavailable, got %d", len(jobs))
+		}
+		return
+	}
+
 	if len(jobs) == 0 {
 		t.Fatal("ScheduledJobs returned empty slice")
 	}

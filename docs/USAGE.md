@@ -63,6 +63,10 @@ curl http://localhost:7788/api/v1/plugins/update/config
 |-------------------|---------------|--------------------------------|
 | update.security   | `0 3 * * *`  | Run automatic security updates |
 
+> **Note:** The security cron job is only registered on systems that have a
+> separate security apt source (e.g. Debian). On Raspberry Pi OS and similar
+> distros where security fixes ship in the main repo, the job is omitted.
+
 ## 5. Configuration
 
 The plugin exposes a read-only configuration view via `GET /config`:
@@ -70,9 +74,10 @@ The plugin exposes a read-only configuration view via `GET /config`:
 ```json
 {
   "auto_security_updates": true,
+  "security_available": true,
   "schedule": "0 3 * * *"
 }
 ```
 
-These are plugin-defined, read-only defaults; they are not directly
-user-configurable.
+When the system lacks a separate security apt source, `security_available`
+and `auto_security_updates` are `false` and the `schedule` field is omitted.
