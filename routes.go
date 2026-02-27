@@ -88,9 +88,13 @@ func (h *handler) handleLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) handleConfig(w http.ResponseWriter, _ *http.Request) {
+	secAvail := h.svc.SecurityAvailable()
 	cfg := map[string]any{
-		"auto_security_updates": true,
-		"schedule":              "0 3 * * *",
+		"auto_security_updates": secAvail,
+		"security_available":    secAvail,
+	}
+	if secAvail {
+		cfg["schedule"] = "0 3 * * *"
 	}
 	writeJSON(w, http.StatusOK, cfg)
 }

@@ -1,6 +1,7 @@
 package update
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -34,14 +35,51 @@ type RunStatus struct {
 
 // Service contains the domain logic for update management.
 type Service struct {
-	mu      sync.Mutex
-	lastRun *RunStatus
+	mu                sync.Mutex
+	lastRun           *RunStatus
+	securityAvailable bool // cached result from Init
 }
 
 var (
 	errNotLinux    = errors.New("update plugin requires Linux")
 	errAptNotFound = errors.New("apt-get not found in PATH")
+
+	// aptReleaseRe matches the suite (n=) or archive (a=) fields in
+	// apt-cache policy output.  The fields are comma-separated, e.g.:
+	//   release v=12,o=Debian,a=stable-security,n=bookworm-security,l=...
+	// The field may also be the first in the list (no leading comma).
+	aptReleaseRe = regexp.MustCompile(`(?:^|,)(?:n|a)=([^,]+)`)
 )
+
+// Init probes the system once and caches whether a security-only apt
+// source is available.  Call this at startup (non-Linux is a no-op).
+func (s *Service) Init() {
+	if runtime.GOOS != "linux" {
+		return
+	}
+	codename, err := distroCodename()
+	if err != nil {
+		slog.Warn("cannot determine codename, disabling security-only updates",
+			"plugin", "update", "error", err)
+		return
+	}
+	avail, err := hasAptRelease(codename + "-security")
+	if err != nil {
+		slog.Warn("could not check security source, disabling security-only updates",
+			"plugin", "update", "error", err)
+		return
+	}
+	s.securityAvailable = avail
+	slog.Info("security source detection complete",
+		"plugin", "update", "available", avail)
+}
+
+// SecurityAvailable reports whether the system has a separate security
+// apt source (e.g. bookworm-security).  Systems without one (like
+// Raspberry Pi OS) should use full upgrade for security fixes.
+func (s *Service) SecurityAvailable() bool {
+	return s.securityAvailable
+}
 
 // parsePendingUpdates parses the output of `apt list --upgradable` into
 // PendingUpdate structs. Each output line has the form:
@@ -190,9 +228,15 @@ func (s *Service) runAptCommand(runType string, args ...string) error {
 
 // RunSecurityUpdates applies only security pocket updates by restricting
 // the apt target release to the distribution's security pocket.
+// Returns a clear error on distros that lack a separate security source
+// (e.g. Raspberry Pi OS).
 func (s *Service) RunSecurityUpdates() error {
 	if runtime.GOOS != "linux" {
 		return errNotLinux
+	}
+
+	if !s.securityAvailable {
+		return fmt.Errorf("security-only updates unavailable on this system — use full upgrade instead")
 	}
 
 	codename, err := distroCodename()
@@ -200,11 +244,37 @@ func (s *Service) RunSecurityUpdates() error {
 		return fmt.Errorf("cannot determine distribution codename: %w", err)
 	}
 
+	secRelease := codename + "-security"
 	return s.runAptCommand("security",
 		"-y", "-o", "Dpkg::Options::=--force-confold",
-		"-t", codename+"-security",
+		"-t", secRelease,
 		"upgrade",
 	)
+}
+
+// hasAptRelease checks whether the given release (e.g. "bookworm-security")
+// is available in the configured apt sources by inspecting the suite (n=)
+// and archive (a=) fields of apt-cache policy output.
+func hasAptRelease(release string) (bool, error) {
+	aptCachePath, err := exec.LookPath("apt-cache")
+	if err != nil {
+		return false, fmt.Errorf("apt-cache not found: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	out, err := exec.CommandContext(ctx, aptCachePath, "policy").CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("apt-cache policy failed: %w", err)
+	}
+
+	for _, m := range aptReleaseRe.FindAllStringSubmatch(string(out), -1) {
+		if m[1] == release {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // distroCodename reads the VERSION_CODENAME from /etc/os-release.

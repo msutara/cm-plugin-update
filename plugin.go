@@ -20,7 +20,9 @@ type UpdatePlugin struct {
 
 // NewUpdatePlugin creates an UpdatePlugin with a shared Service instance.
 func NewUpdatePlugin() *UpdatePlugin {
-	return &UpdatePlugin{svc: &Service{}}
+	svc := &Service{}
+	svc.Init()
+	return &UpdatePlugin{svc: svc}
 }
 
 func (p *UpdatePlugin) Name() string {
@@ -40,6 +42,9 @@ func (p *UpdatePlugin) Routes() http.Handler {
 }
 
 func (p *UpdatePlugin) ScheduledJobs() []plugin.JobDefinition {
+	if !p.svc.SecurityAvailable() {
+		return nil
+	}
 	return []plugin.JobDefinition{
 		{
 			ID:          "update.security",
