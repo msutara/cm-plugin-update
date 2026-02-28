@@ -54,3 +54,12 @@ func (p *UpdatePlugin) ScheduledJobs() []plugin.JobDefinition {
 		},
 	}
 }
+
+func (p *UpdatePlugin) Endpoints() []plugin.Endpoint {
+	return []plugin.Endpoint{
+		{Method: http.MethodGet, Path: "/status", Description: "Pending updates and system info"},
+		{Method: http.MethodGet, Path: "/logs", Description: "Last update run output"},
+		{Method: http.MethodGet, Path: "/config", Description: "Update plugin configuration"},
+		{Method: http.MethodPost, Path: "/run", Description: "Trigger update run"},
+	}
+}
