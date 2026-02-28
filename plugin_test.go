@@ -62,6 +62,30 @@ func TestUpdatePlugin_Routes(t *testing.T) {
 	}
 }
 
+func TestUpdatePlugin_Endpoints(t *testing.T) {
+	p := NewUpdatePlugin()
+	eps := p.Endpoints()
+
+	if len(eps) != 4 {
+		t.Fatalf("Endpoints: got %d, want 4", len(eps))
+	}
+
+	want := []struct{ method, path string }{
+		{http.MethodGet, "/status"},
+		{http.MethodGet, "/logs"},
+		{http.MethodGet, "/config"},
+		{http.MethodPost, "/run"},
+	}
+	for i, w := range want {
+		if eps[i].Method != w.method || eps[i].Path != w.path {
+			t.Errorf("endpoint[%d] = %s %s, want %s %s", i, eps[i].Method, eps[i].Path, w.method, w.path)
+		}
+		if eps[i].Description == "" {
+			t.Errorf("endpoint[%d] has empty description", i)
+		}
+	}
+}
+
 func TestUpdatePlugin_ScheduledJobs(t *testing.T) {
 	p := NewUpdatePlugin()
 	jobs := p.ScheduledJobs()
