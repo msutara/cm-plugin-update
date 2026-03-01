@@ -59,13 +59,9 @@ curl http://localhost:7788/api/v1/plugins/update/config
 
 ## 4. Scheduled Jobs
 
-| Job ID            | Schedule      | Description                    |
-|-------------------|---------------|--------------------------------|
-| update.security   | `0 3 * * *`  | Run automatic security updates |
-
-> **Note:** The security cron job is only registered on systems that have a
-> separate security apt source (e.g. Debian). On Raspberry Pi OS and similar
-> distros where security fixes ship in the main repo, the job is omitted.
+| Job ID            | Default Schedule | Description                    |
+|-------------------|------------------|--------------------------------|
+| update.security   | `0 3 * * *`     | Run automatic security updates |
 
 ## 5. Configuration
 
@@ -73,11 +69,20 @@ The plugin exposes a read-only configuration view via `GET /config`:
 
 ```json
 {
-  "auto_security_updates": true,
-  "security_available": true,
-  "schedule": "0 3 * * *"
+  "schedule": "0 3 * * *",
+  "auto_security": true,
+  "security_source": "available",
+  "security_available": true
 }
 ```
 
-When the system lacks a separate security apt source, `security_available`
-and `auto_security_updates` are `false` and the `schedule` field is omitted.
+| Field                | Type   | Description                                      |
+| -------------------- | ------ | ------------------------------------------------ |
+| `schedule`           | string | Cron expression for automatic security updates   |
+| `auto_security`      | bool   | Whether automatic security updates are enabled   |
+| `security_source`    | string | `"available"` or `"always"` — controls gating    |
+| `security_available` | bool   | Whether the system has a security apt source     |
+
+When `security_source` is `"available"` and the system lacks a separate
+security apt source, the scheduled job is omitted. When set to `"always"`,
+the job runs regardless of source availability.

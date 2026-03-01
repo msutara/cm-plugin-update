@@ -13,9 +13,9 @@ import (
 // maxRequestBody is the maximum allowed size for incoming request bodies (1 MB).
 const maxRequestBody = 1 << 20
 
-func newRouter(svc *Service) http.Handler {
+func newRouter(svc *Service, configFn func() map[string]any) http.Handler {
 	r := chi.NewRouter()
-	h := &handler{svc: svc}
+	h := &handler{svc: svc, configFn: configFn}
 	r.Get("/status", h.handleStatus)
 	r.Post("/run", h.handleRun)
 	r.Get("/logs", h.handleLogs)
@@ -25,7 +25,8 @@ func newRouter(svc *Service) http.Handler {
 
 // handler groups HTTP handlers with a shared Service instance.
 type handler struct {
-	svc *Service
+	svc      *Service
+	configFn func() map[string]any
 }
 
 func (h *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -88,14 +89,8 @@ func (h *handler) handleLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) handleConfig(w http.ResponseWriter, _ *http.Request) {
-	secAvail := h.svc.SecurityAvailable()
-	cfg := map[string]any{
-		"auto_security_updates": secAvail,
-		"security_available":    secAvail,
-	}
-	if secAvail {
-		cfg["schedule"] = "0 3 * * *"
-	}
+	cfg := h.configFn()
+	cfg["security_available"] = h.svc.SecurityAvailable()
 	writeJSON(w, http.StatusOK, cfg)
 }
 
