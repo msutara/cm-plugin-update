@@ -73,12 +73,13 @@ Errors follow the core convention:
 
 ## 6. Scheduled Jobs
 
-| Job ID            | Schedule      | Description                    |
-|-------------------|---------------|--------------------------------|
-| update.security   | `0 3 * * *`  | Run automatic security updates |
+| Job ID            | Default Schedule | Description                    |
+|-------------------|------------------|--------------------------------|
+| update.security   | `0 3 * * *`     | Run automatic security updates |
 
-> The security job is only registered on systems with a separate security apt
-> source (e.g. Debian). On Raspberry Pi OS it is omitted.
+> The security job is only registered when `auto_security` is enabled. When
+> `security_source` is `"available"`, the job requires a separate security apt
+> source (e.g. Debian). When set to `"always"`, the job runs regardless.
 
 ## 7. Configuration
 
@@ -86,12 +87,22 @@ The plugin exposes a read-only configuration view via `GET /config`:
 
 ```json
 {
-  "auto_security_updates": true,
-  "security_available": true,
-  "schedule": "0 3 * * *"
+  "schedule": "0 3 * * *",
+  "auto_security": true,
+  "security_source": "available",
+  "security_available": true
 }
 ```
 
-When the system lacks a separate security apt source, `security_available`
-and `auto_security_updates` are `false` and `schedule` is omitted.
-Behaviour is controlled via the API endpoints and the core scheduler.
+| Field                | Type   | Description                                      |
+| -------------------- | ------ | ------------------------------------------------ |
+| `schedule`           | string | Cron expression for automatic security updates   |
+| `auto_security`      | bool   | Whether automatic security updates are enabled   |
+| `security_source`    | string | `"available"` or `"always"` — controls gating    |
+| `security_available` | bool   | Whether the system has a security apt source     |
+
+When `security_source` is `"available"` and the system lacks a separate
+security apt source, the scheduled job is omitted. When set to `"always"`,
+the job runs regardless.
+Configuration is managed via the core's settings endpoint
+(`PUT /api/v1/plugins/update/settings`).

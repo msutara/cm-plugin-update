@@ -9,9 +9,20 @@ import (
 	"testing"
 )
 
+// defaultConfigFn returns a config function with default values for tests.
+func defaultConfigFn() func() map[string]any {
+	return func() map[string]any {
+		return map[string]any{
+			"schedule":        DefaultSchedule,
+			"auto_security":   DefaultAutoSecurity,
+			"security_source": DefaultSecuritySource,
+		}
+	}
+}
+
 func TestHandleStatus(t *testing.T) {
 	svc := &Service{}
-	router := newRouter(svc)
+	router := newRouter(svc, defaultConfigFn())
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/status", nil)
 	router.ServeHTTP(w, r)
@@ -28,7 +39,7 @@ func TestHandleStatus(t *testing.T) {
 
 func TestHandleRun_MissingBody(t *testing.T) {
 	svc := &Service{}
-	router := newRouter(svc)
+	router := newRouter(svc, defaultConfigFn())
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/run", nil)
 	router.ServeHTTP(w, r)
@@ -40,7 +51,7 @@ func TestHandleRun_MissingBody(t *testing.T) {
 
 func TestHandleRun_EmptyType(t *testing.T) {
 	svc := &Service{}
-	router := newRouter(svc)
+	router := newRouter(svc, defaultConfigFn())
 	body := `{"type": ""}`
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/run", bytes.NewBufferString(body))
@@ -53,7 +64,7 @@ func TestHandleRun_EmptyType(t *testing.T) {
 
 func TestHandleRun_UnknownType(t *testing.T) {
 	svc := &Service{}
-	router := newRouter(svc)
+	router := newRouter(svc, defaultConfigFn())
 	body := `{"type": "partial"}`
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/run", bytes.NewBufferString(body))
@@ -66,7 +77,7 @@ func TestHandleRun_UnknownType(t *testing.T) {
 
 func TestHandleRun_InvalidJSON(t *testing.T) {
 	svc := &Service{}
-	router := newRouter(svc)
+	router := newRouter(svc, defaultConfigFn())
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/run", bytes.NewBufferString("not json"))
 	router.ServeHTTP(w, r)
@@ -78,7 +89,7 @@ func TestHandleRun_InvalidJSON(t *testing.T) {
 
 func TestHandleRun_BodyTooLarge(t *testing.T) {
 	svc := &Service{}
-	router := newRouter(svc)
+	router := newRouter(svc, defaultConfigFn())
 	// Create a body larger than maxRequestBody (1 MB)
 	large := `{"type": "` + strings.Repeat("x", maxRequestBody+1) + `"}`
 	w := httptest.NewRecorder()
@@ -92,7 +103,7 @@ func TestHandleRun_BodyTooLarge(t *testing.T) {
 
 func TestHandleLogs(t *testing.T) {
 	svc := &Service{}
-	router := newRouter(svc)
+	router := newRouter(svc, defaultConfigFn())
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/logs", nil)
 	router.ServeHTTP(w, r)
@@ -112,7 +123,7 @@ func TestHandleLogs(t *testing.T) {
 
 func TestHandleConfig(t *testing.T) {
 	svc := &Service{}
-	router := newRouter(svc)
+	router := newRouter(svc, defaultConfigFn())
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/config", nil)
 	router.ServeHTTP(w, r)
@@ -125,8 +136,14 @@ func TestHandleConfig(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &cfg); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
-	if _, ok := cfg["auto_security_updates"]; !ok {
-		t.Fatal("missing auto_security_updates in config response")
+	if _, ok := cfg["schedule"]; !ok {
+		t.Fatal("missing schedule in config response")
+	}
+	if _, ok := cfg["auto_security"]; !ok {
+		t.Fatal("missing auto_security in config response")
+	}
+	if _, ok := cfg["security_source"]; !ok {
+		t.Fatal("missing security_source in config response")
 	}
 	if _, ok := cfg["security_available"]; !ok {
 		t.Fatal("missing security_available in config response")
@@ -134,9 +151,8 @@ func TestHandleConfig(t *testing.T) {
 }
 
 func TestHandleConfig_SecurityAvailableReflectsService(t *testing.T) {
-	// Default Service has securityAvailable=false.
 	svc := &Service{}
-	router := newRouter(svc)
+	router := newRouter(svc, defaultConfigFn())
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/config", nil)
 	router.ServeHTTP(w, r)
@@ -148,16 +164,9 @@ func TestHandleConfig_SecurityAvailableReflectsService(t *testing.T) {
 	if cfg["security_available"] != false {
 		t.Errorf("expected security_available=false, got %v", cfg["security_available"])
 	}
-	if cfg["auto_security_updates"] != false {
-		t.Errorf("expected auto_security_updates=false when security unavailable, got %v", cfg["auto_security_updates"])
-	}
-	if _, ok := cfg["schedule"]; ok {
-		t.Error("expected schedule absent when security unavailable")
-	}
 
-	// When securityAvailable is set, the config endpoint reflects it.
 	svc2 := &Service{securityAvailable: true}
-	router2 := newRouter(svc2)
+	router2 := newRouter(svc2, defaultConfigFn())
 	w2 := httptest.NewRecorder()
 	r2 := httptest.NewRequest(http.MethodGet, "/config", nil)
 	router2.ServeHTTP(w2, r2)
@@ -168,11 +177,5 @@ func TestHandleConfig_SecurityAvailableReflectsService(t *testing.T) {
 	}
 	if cfg2["security_available"] != true {
 		t.Errorf("expected security_available=true, got %v", cfg2["security_available"])
-	}
-	if cfg2["auto_security_updates"] != true {
-		t.Errorf("expected auto_security_updates=true, got %v", cfg2["auto_security_updates"])
-	}
-	if _, ok := cfg2["schedule"]; !ok {
-		t.Error("expected schedule present when security available")
 	}
 }
