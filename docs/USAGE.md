@@ -71,7 +71,7 @@ The plugin exposes a read-only configuration view via `GET /config`:
 {
   "schedule": "0 3 * * *",
   "auto_security": true,
-  "security_source": "available",
+  "security_source": "detected",
   "security_available": true
 }
 ```
@@ -80,7 +80,7 @@ The plugin exposes a read-only configuration view via `GET /config`:
 | -------------------- | ------ | ------------------------------------------------ |
 | `schedule`           | string | Cron expression for automatic security updates   |
 | `auto_security`      | bool   | Whether automatic security updates are enabled   |
-| `security_source`    | string | `"available"` or `"always"` — controls gating    |
+| `security_source`    | string | `"detected"` or `"always"` — controls gating    |
 | `security_available` | bool   | Read-only; computed once at startup, not persisted in config |
 
 `security_available` is determined once during service initialization by
@@ -88,6 +88,6 @@ probing the system's apt sources. The cached value is returned in every
 `/config` response for informational purposes but is not a configurable
 setting.
 
-When `security_source` is `"available"` and the system lacks a separate
+When `security_source` is `"detected"` and the system lacks a separate
 security apt source, the scheduled job is omitted. When set to `"always"`,
 the job runs regardless of source availability.

@@ -336,14 +336,14 @@ func TestUpdatePlugin_ScheduledJobsAlwaysMode(t *testing.T) {
 	}
 }
 
-func TestUpdatePlugin_ScheduledJobsAvailableMode(t *testing.T) {
+func TestUpdatePlugin_ScheduledJobsDetectedMode(t *testing.T) {
 	p := NewUpdatePlugin()
 	p.autoSecurity = true
-	p.securitySource = "available"
+	p.securitySource = "detected"
 	p.svc.securityAvailable = false
 
 	jobs := p.ScheduledJobs()
 	if len(jobs) != 0 {
-		t.Errorf("securitySource=available should skip when SecurityAvailable()=false, got %d", len(jobs))
+		t.Errorf("securitySource=detected should skip when SecurityAvailable()=false, got %d", len(jobs))
 	}
 }
