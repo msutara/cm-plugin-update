@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+// newTestService returns a *Service with initOnce already consumed so the
+// real apt probe never runs.  The caller can set securityAvailable before
+// or after; initOnce.Do will be a no-op either way.
+func newTestService(secAvail bool) *Service {
+	svc := &Service{securityAvailable: secAvail}
+	svc.initOnce.Do(func() {})
+	return svc
+}
+
 func TestParsePendingUpdates_Typical(t *testing.T) {
 	output := `Listing... Done
 curl/bookworm-security 8.4.0-2+b1 amd64 [upgradable from: 8.4.0-2]
@@ -129,7 +138,7 @@ func TestRunSecurityUpdates_NonLinux(t *testing.T) {
 }
 
 func TestRunSecurityUpdates_Unavailable(t *testing.T) {
-	svc := &Service{securityAvailable: false}
+	svc := newTestService(false)
 	err := svc.RunSecurityUpdates()
 	if runtime.GOOS != "linux" {
 		// On non-Linux, errNotLinux fires first.
@@ -351,10 +360,10 @@ func TestAptReleaseRe(t *testing.T) {
 	}
 }
 
-func TestSecurityAvailable_DefaultFalse(t *testing.T) {
-	svc := &Service{}
+func TestSecurityAvailable_WithoutProbe(t *testing.T) {
+	svc := newTestService(false)
 	if svc.SecurityAvailable() {
-		t.Error("expected SecurityAvailable()=false for zero-value Service")
+		t.Error("expected SecurityAvailable()=false when initOnce consumed without probe")
 	}
 }
 

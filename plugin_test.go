@@ -316,7 +316,7 @@ func TestUpdatePlugin_ScheduledJobsUsesConfigSchedule(t *testing.T) {
 func TestUpdatePlugin_ScheduledJobsDisabledWhenAutoSecurityFalse(t *testing.T) {
 	p := NewUpdatePlugin()
 	p.autoSecurity = false
-	p.svc.securityAvailable = true
+	p.svc = newTestService(true)
 
 	jobs := p.ScheduledJobs()
 	if len(jobs) != 0 {
@@ -328,7 +328,7 @@ func TestUpdatePlugin_ScheduledJobsAlwaysMode(t *testing.T) {
 	p := NewUpdatePlugin()
 	p.autoSecurity = true
 	p.securitySource = "always"
-	p.svc.securityAvailable = false
+	p.svc = newTestService(false)
 
 	jobs := p.ScheduledJobs()
 	if len(jobs) == 0 {
@@ -340,7 +340,7 @@ func TestUpdatePlugin_ScheduledJobsDetectedMode(t *testing.T) {
 	p := NewUpdatePlugin()
 	p.autoSecurity = true
 	p.securitySource = "detected"
-	p.svc.securityAvailable = false
+	p.svc = newTestService(false)
 
 	jobs := p.ScheduledJobs()
 	if len(jobs) != 0 {

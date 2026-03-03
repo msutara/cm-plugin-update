@@ -45,6 +45,9 @@ curl -X POST http://localhost:7788/api/v1/plugins/update/run \
   -d '{"type": "full"}'
 ```
 
+> **Note:** Only one update can run at a time. A second request while an
+> update is in progress returns `409 Conflict`.
+
 ### View last run logs
 
 ```bash

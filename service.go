@@ -37,12 +37,15 @@ type RunStatus struct {
 type Service struct {
 	mu                sync.Mutex
 	lastRun           *RunStatus
+	running           bool // true while an apt command is executing
+	initOnce          sync.Once
 	securityAvailable bool // cached result from Init
 }
 
 var (
-	errNotLinux    = errors.New("update plugin requires Linux")
-	errAptNotFound = errors.New("apt-get not found in PATH")
+	errNotLinux       = errors.New("update plugin requires Linux")
+	errAptNotFound    = errors.New("apt-get not found in PATH")
+	errAlreadyRunning = errors.New("an update is already running")
 
 	// aptReleaseRe matches the suite (n=) or archive (a=) fields in
 	// apt-cache policy output.  The fields are comma-separated, e.g.:
@@ -52,8 +55,13 @@ var (
 )
 
 // Init probes the system once and caches whether a security-only apt
-// source is available.  Call this at startup (non-Linux is a no-op).
+// source is available.  Safe to call multiple times; only the first
+// call performs the actual probe.
 func (s *Service) Init() {
+	s.initOnce.Do(s.initProbe)
+}
+
+func (s *Service) initProbe() {
 	if runtime.GOOS != "linux" {
 		return
 	}
@@ -77,7 +85,9 @@ func (s *Service) Init() {
 // SecurityAvailable reports whether the system has a separate security
 // apt source (e.g. bookworm-security).  Systems without one (like
 // Raspberry Pi OS) should use full upgrade for security fixes.
+// Ensures the init probe has completed before reading the cached value.
 func (s *Service) SecurityAvailable() bool {
+	s.initOnce.Do(s.initProbe)
 	return s.securityAvailable
 }
 
@@ -176,18 +186,30 @@ func parseUpgradedCount(output string) int {
 }
 
 // runAptCommand executes an apt-get command and records the result in lastRun.
+// Returns errAlreadyRunning if another update is already in progress.
 func (s *Service) runAptCommand(runType string, args ...string) error {
 	if runtime.GOOS != "linux" {
 		return errNotLinux
 	}
 
+	s.mu.Lock()
+	if s.running {
+		s.mu.Unlock()
+		return errAlreadyRunning
+	}
+	s.running = true
+	s.mu.Unlock()
+
+	defer func() {
+		s.mu.Lock()
+		s.running = false
+		s.mu.Unlock()
+	}()
+
 	aptGetPath, err := exec.LookPath("apt-get")
 	if err != nil {
 		return errAptNotFound
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	start := time.Now()
 	slog.Info("starting update run", "plugin", "update", "type", runType)
@@ -213,7 +235,9 @@ func (s *Service) runAptCommand(runType string, args ...string) error {
 		slog.Info("update run completed", "plugin", "update", "type", runType, "duration", duration)
 	}
 
+	s.mu.Lock()
 	s.lastRun = status
+	s.mu.Unlock()
 
 	if err != nil {
 		// Include truncated output in error for better diagnostics.
@@ -235,7 +259,7 @@ func (s *Service) RunSecurityUpdates() error {
 		return errNotLinux
 	}
 
-	if !s.securityAvailable {
+	if !s.SecurityAvailable() {
 		return fmt.Errorf("security-only updates unavailable on this system -- use full upgrade instead")
 	}
 

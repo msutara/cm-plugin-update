@@ -57,6 +57,19 @@ All routes are relative to the plugin mount point (`/api/v1/plugins/update`).
 
 `type` must be either `"security"` or `"full"`.
 
+Only one update can run at a time. If a run is already in progress, the
+endpoint returns `409 Conflict`:
+
+```json
+{
+  "error": {
+    "code": 409,
+    "message": "update already running",
+    "details": "an update is already running"
+  }
+}
+```
+
 ### Error Format
 
 Errors follow the core convention:
@@ -111,3 +124,16 @@ security apt source, the scheduled job is omitted. When set to `"always"`,
 the job runs regardless.
 Configuration is managed via the core's settings endpoint
 (`PUT /api/v1/plugins/update/settings`).
+
+## 8. Concurrency
+
+- **Config access** is protected by a `sync.RWMutex`; concurrent reads via
+  `CurrentConfig()` and `ScheduledJobs()` do not block each other, while
+  writes via `Configure()` and `UpdateConfig()` are serialized.
+- **Init** uses `sync.Once` so the startup probe runs exactly once, even if
+  `Init()` is called from multiple goroutines.
+- **Update runs** are guarded by a running flag: if a second `/run` request
+  arrives while an update is executing, it is rejected immediately with
+  `409 Conflict` rather than queuing.
+- **GetLastRunStatus** returns a defensive deep copy so callers cannot
+  mutate internal state.

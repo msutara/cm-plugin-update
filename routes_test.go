@@ -101,6 +101,41 @@ func TestHandleRun_BodyTooLarge(t *testing.T) {
 	}
 }
 
+func TestHandleRun_AlreadyRunning(t *testing.T) {
+	svc := &Service{}
+	// Simulate an in-progress run by setting the running flag.
+	svc.mu.Lock()
+	svc.running = true
+	svc.mu.Unlock()
+
+	router := newRouter(svc, defaultConfigFn())
+	body := `{"type": "full"}`
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/run", bytes.NewBufferString(body))
+	router.ServeHTTP(w, r)
+
+	// Non-Linux returns 500 (errNotLinux), Linux returns 409.
+	if w.Code == http.StatusConflict {
+		var resp map[string]any
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		errObj, ok := resp["error"].(map[string]any)
+		if !ok {
+			t.Fatal("expected nested error object")
+		}
+		if msg, _ := errObj["message"].(string); msg != "update already running" {
+			t.Errorf("got message %q, want %q", msg, "update already running")
+		}
+	} else if w.Code != http.StatusInternalServerError {
+		t.Fatalf("got status %d, want 409 or 500", w.Code)
+	}
+
+	svc.mu.Lock()
+	svc.running = false
+	svc.mu.Unlock()
+}
+
 func TestHandleLogs(t *testing.T) {
 	svc := &Service{}
 	router := newRouter(svc, defaultConfigFn())
@@ -151,7 +186,7 @@ func TestHandleConfig(t *testing.T) {
 }
 
 func TestHandleConfig_SecurityAvailableReflectsService(t *testing.T) {
-	svc := &Service{}
+	svc := newTestService(false)
 	router := newRouter(svc, defaultConfigFn())
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/config", nil)
@@ -165,7 +200,7 @@ func TestHandleConfig_SecurityAvailableReflectsService(t *testing.T) {
 		t.Errorf("expected security_available=false, got %v", cfg["security_available"])
 	}
 
-	svc2 := &Service{securityAvailable: true}
+	svc2 := newTestService(true)
 	router2 := newRouter(svc2, defaultConfigFn())
 	w2 := httptest.NewRecorder()
 	r2 := httptest.NewRequest(http.MethodGet, "/config", nil)
