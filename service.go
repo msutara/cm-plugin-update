@@ -71,7 +71,7 @@ func (s *Service) Init() {
 	}
 	s.securityAvailable = avail
 	slog.Info("security source detection complete",
-		"plugin", "update", "available", avail)
+		"plugin", "update", "detected", avail)
 }
 
 // SecurityAvailable reports whether the system has a separate security
