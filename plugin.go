@@ -2,7 +2,9 @@ package update
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/msutara/config-manager-core/plugin"
@@ -110,6 +112,37 @@ func (p *UpdatePlugin) Endpoints() []plugin.Endpoint {
 	}
 }
 
+// cronShortcuts are the standard @-shortcuts accepted by the core scheduler.
+var cronShortcuts = map[string]bool{
+	"@yearly":   true,
+	"@annually": true,
+	"@monthly":  true,
+	"@weekly":   true,
+	"@daily":    true,
+	"@midnight": true,
+	"@hourly":   true,
+}
+
+// validateCronExpr checks that expr is a valid cron expression structurally.
+// It accepts the standard 5-field format and @-shortcuts (@daily, @weekly, etc.).
+// Full semantic validation (field ranges, names) is performed by the core
+// scheduler at job registration time.
+func validateCronExpr(expr string) error {
+	trimmed := strings.TrimSpace(expr)
+	if cronShortcuts[strings.ToLower(trimmed)] {
+		return nil
+	}
+	fields := strings.Fields(trimmed)
+	if len(fields) != 5 {
+		return fmt.Errorf(
+			"expected 5 fields (minute hour dom month dow), got %d"+
+				"; if your expression has a seconds field, remove it"+
+				" (6/7-field cron is not supported)",
+			len(fields))
+	}
+	return nil
+}
+
 // Configure applies persisted config from the YAML file at startup.
 func (p *UpdatePlugin) Configure(cfg map[string]any) {
 	if cfg == nil {
@@ -119,7 +152,12 @@ func (p *UpdatePlugin) Configure(cfg map[string]any) {
 	defer p.mu.Unlock()
 
 	if v, ok := cfg["schedule"].(string); ok && v != "" {
-		p.schedule = v
+		if err := validateCronExpr(v); err != nil {
+			slog.Warn("invalid schedule ignored",
+				"plugin", "update", "schedule", v, "default", DefaultSchedule, "error", err)
+		} else {
+			p.schedule = strings.TrimSpace(v)
+		}
 	}
 	if v, ok := cfg["auto_security"].(bool); ok {
 		p.autoSecurity = v
@@ -140,7 +178,10 @@ func (p *UpdatePlugin) UpdateConfig(key string, value any) error {
 		if !ok || v == "" {
 			return fmt.Errorf("schedule must be a non-empty string")
 		}
-		p.schedule = v
+		if err := validateCronExpr(v); err != nil {
+			return fmt.Errorf("invalid schedule: %w", err)
+		}
+		p.schedule = strings.TrimSpace(v)
 	case "auto_security":
 		v, ok := value.(bool)
 		if !ok {
