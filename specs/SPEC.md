@@ -137,3 +137,11 @@ Configuration is managed via the core's settings endpoint
   `409 Conflict` rather than queuing.
 - **GetLastRunStatus** returns a defensive deep copy so callers cannot
   mutate internal state.
+
+## 9. Resource Limits
+
+- **Log output** stored in `RunStatus.Log` is capped at 64 KB total,
+  including any truncation marker. When apt output exceeds the limit,
+  `RunStatus.Log` consists of a `...(truncated)\n` marker followed by the
+  last bytes of apt output such that the total length never exceeds 64 KB.
+  The full apt output is still parsed for package counts before truncation.

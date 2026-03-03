@@ -342,6 +342,8 @@ func TestAptReleaseRe(t *testing.T) {
 		{"release prefix n first", "     release n=bookworm-security,o=Debian,a=stable", "bookworm-security", true},
 		{"release prefix a first", "     release a=stable-security,n=bookworm-security,l=Debian", "stable-security", true},
 		{"comma-separated mid-line", "v=12,o=Debian,n=bookworm-security,l=Debian", "bookworm-security", true},
+		{"newline before release field", "v=12,o=Debian\n     n=bookworm-security,l=Debian", "bookworm-security", true},
+		{"bare newline n= field", "\nn=bookworm-security,o=Debian", "bookworm-security", true},
 	}
 
 	for _, tc := range cases {
@@ -357,6 +359,59 @@ func TestAptReleaseRe(t *testing.T) {
 				t.Errorf("release %q: got %v, want %v", tc.release, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestHasAptRelease_NoAptCache(t *testing.T) {
+	t.Setenv("PATH", "")
+	ok, err := hasAptRelease("bookworm-security")
+	if err == nil {
+		t.Fatal("expected error when apt-cache not in PATH")
+	}
+	if ok {
+		t.Error("expected false when apt-cache unavailable")
+	}
+}
+
+func TestTruncateLog(t *testing.T) {
+	short := "hello"
+	if got := truncateLog(short, 100); got != short {
+		t.Errorf("short string changed: got %q", got)
+	}
+
+	exact := strings.Repeat("x", 100)
+	if got := truncateLog(exact, 100); got != exact {
+		t.Errorf("exact-length string changed: got len %d", len(got))
+	}
+
+	long := strings.Repeat("a", 50) + strings.Repeat("b", 60)
+	got := truncateLog(long, 60)
+	if !strings.HasPrefix(got, "...(truncated)\n") {
+		t.Error("expected truncation marker")
+	}
+	if len(got) > 60 {
+		t.Errorf("truncated result exceeds cap: len %d > 60", len(got))
+	}
+
+	// Marker is included within the cap.
+	marker := "...(truncated)\n"
+	wantTail := 60 - len(marker)
+	if !strings.HasSuffix(got, strings.Repeat("b", wantTail)) {
+		t.Errorf("expected last %d bytes of b's preserved", wantTail)
+	}
+
+	// When maxBytes is smaller than the marker length, the result must
+	// still obey the cap and never exceed maxBytes.
+	smallCap := len(marker) - 5
+	longSmall := strings.Repeat("x", smallCap*4)
+	gotSmall := truncateLog(longSmall, smallCap)
+	if len(gotSmall) > smallCap {
+		t.Errorf("truncated result exceeds small cap: len %d > %d", len(gotSmall), smallCap)
+	}
+
+	// Zero cap returns empty.
+	if got0 := truncateLog("anything", 0); got0 != "" {
+		t.Errorf("expected empty for maxBytes=0, got %q", got0)
 	}
 }
 
