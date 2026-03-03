@@ -42,6 +42,8 @@ type Service struct {
 	securityAvailable bool // cached result from Init
 }
 
+const maxLogBytes = 64 * 1024 // 64 KB cap for RunStatus.Log
+
 var (
 	errNotLinux       = errors.New("update plugin requires Linux")
 	errAptNotFound    = errors.New("apt-get not found in PATH")
@@ -217,15 +219,17 @@ func (s *Service) runAptCommand(runType string, args ...string) error {
 	cmd := exec.Command(aptGetPath, args...)
 	cmd.Env = append(cmd.Environ(), "DEBIAN_FRONTEND=noninteractive")
 	out, err := cmd.CombinedOutput()
+	outStr := string(out)
 
 	duration := time.Since(start)
+	logText := truncateLog(outStr, maxLogBytes)
 	status := &RunStatus{
 		Type:      runType,
 		Status:    "success",
 		StartedAt: &start,
 		Duration:  duration.Round(time.Millisecond).String(),
-		Packages:  parseUpgradedCount(string(out)),
-		Log:       string(out),
+		Packages:  parseUpgradedCount(outStr),
+		Log:       logText,
 	}
 
 	if err != nil {
@@ -241,7 +245,7 @@ func (s *Service) runAptCommand(runType string, args ...string) error {
 
 	if err != nil {
 		// Include truncated output in error for better diagnostics.
-		detail := string(out)
+		detail := outStr
 		if len(detail) > 500 {
 			detail = detail[len(detail)-500:]
 		}
@@ -347,4 +351,22 @@ func (s *Service) GetLastRunStatus() (*RunStatus, error) {
 		cp.StartedAt = &t
 	}
 	return &cp, nil
+}
+
+// truncateLog keeps the last maxBytes of s, prefixing with a marker when
+// truncation occurs so consumers know output was clipped. The returned
+// string never exceeds maxBytes (marker included).
+func truncateLog(s string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	if len(s) <= maxBytes {
+		return s
+	}
+	const marker = "...(truncated)\n"
+	if maxBytes < len(marker) {
+		return s[len(s)-maxBytes:]
+	}
+	keep := maxBytes - len(marker)
+	return marker + s[len(s)-keep:]
 }
