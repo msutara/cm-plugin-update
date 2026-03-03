@@ -3,6 +3,7 @@ package update
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/msutara/config-manager-core/plugin"
@@ -357,6 +358,122 @@ func TestUpdatePlugin_ScheduledJobsAlwaysMode(t *testing.T) {
 	}
 }
 
+func TestValidateCronExpr_Valid(t *testing.T) {
+	for _, expr := range []string{"0 3 * * *", "*/5 * * * *", "0 2 * * MON"} {
+		if err := validateCronExpr(expr); err != nil {
+			t.Errorf("validateCronExpr(%q) = %v, want nil", expr, err)
+		}
+	}
+}
+
+func TestValidateCronExpr_Shortcuts(t *testing.T) {
+	for _, expr := range []string{"@daily", "@weekly", "@monthly", "@yearly", "@annually", "@midnight", "@hourly"} {
+		if err := validateCronExpr(expr); err != nil {
+			t.Errorf("validateCronExpr(%q) = %v, want nil", expr, err)
+		}
+	}
+}
+
+func TestValidateCronExpr_ShortcutsCaseInsensitive(t *testing.T) {
+	for _, expr := range []string{"@Daily", "@WEEKLY", "@Monthly"} {
+		if err := validateCronExpr(expr); err != nil {
+			t.Errorf("validateCronExpr(%q) = %v, want nil", expr, err)
+		}
+	}
+}
+
+func TestValidateCronExpr_TooManyFields(t *testing.T) {
+	err := validateCronExpr("0 2 * * * MON")
+	if err == nil {
+		t.Fatal("expected error for 6-field cron")
+	}
+	if !strings.Contains(err.Error(), "expected 5 fields") {
+		t.Errorf("error should mention 5 fields: %v", err)
+	}
+	if !strings.Contains(err.Error(), "seconds field") {
+		t.Errorf("error should mention seconds field: %v", err)
+	}
+}
+
+func TestValidateCronExpr_TooFewFields(t *testing.T) {
+	err := validateCronExpr("0 3 *")
+	if err == nil {
+		t.Fatal("expected error for 3-field cron")
+	}
+	if !strings.Contains(err.Error(), "got 3") {
+		t.Errorf("error should say got 3: %v", err)
+	}
+}
+
+func TestUpdatePlugin_ConfigureInvalidCronKeepsDefault(t *testing.T) {
+	p := NewUpdatePlugin()
+	original := p.schedule
+	p.Configure(map[string]any{
+		"schedule": "0 2 * * * MON",
+	})
+	if p.schedule != original {
+		t.Errorf("invalid cron should not change schedule: got %q, want %q", p.schedule, original)
+	}
+}
+
+func TestUpdatePlugin_UpdateConfigInvalidCronReturnsError(t *testing.T) {
+	p := NewUpdatePlugin()
+	err := p.UpdateConfig("schedule", "0 2 * * * MON")
+	if err == nil {
+		t.Fatal("expected error for 6-field cron in UpdateConfig")
+	}
+	if !strings.Contains(err.Error(), "invalid schedule") {
+		t.Errorf("error should say 'invalid schedule': %v", err)
+	}
+}
+
+func TestUpdatePlugin_UpdateConfigValidCronAccepted(t *testing.T) {
+	p := NewUpdatePlugin()
+	err := p.UpdateConfig("schedule", "0 2 * * 1")
+	if err != nil {
+		t.Fatalf("valid 5-field cron should succeed: %v", err)
+	}
+	if p.schedule != "0 2 * * 1" {
+		t.Errorf("schedule = %q, want %q", p.schedule, "0 2 * * 1")
+	}
+}
+
+func TestUpdatePlugin_UpdateConfigShortcutAccepted(t *testing.T) {
+	p := NewUpdatePlugin()
+	err := p.UpdateConfig("schedule", "@daily")
+	if err != nil {
+		t.Fatalf("@daily shortcut should succeed: %v", err)
+	}
+	if p.schedule != "@daily" {
+		t.Errorf("schedule = %q, want %q", p.schedule, "@daily")
+	}
+}
+
+func TestUpdatePlugin_Configure6FieldKeepsDefaultSchedule(t *testing.T) {
+	// Regression test: 6-field Quartz cron should not persist, and
+	// ScheduledJobs should use the default (not the invalid expression).
+	p := NewUpdatePlugin()
+	p.autoSecurity = true
+	p.securitySource = "always"
+	p.svc = newTestService(true)
+
+	p.Configure(map[string]any{
+		"schedule": "0 2 * * * MON",
+	})
+	if p.schedule != DefaultSchedule {
+		t.Errorf("schedule = %q after invalid cron, want default %q", p.schedule, DefaultSchedule)
+	}
+
+	jobs := p.ScheduledJobs()
+	secJob := findJob(jobs, "update.security")
+	if secJob == nil {
+		t.Fatal("update.security job should be present")
+	}
+	if secJob.Cron != DefaultSchedule {
+		t.Errorf("security job cron = %q, want default %q", secJob.Cron, DefaultSchedule)
+	}
+}
+
 func TestUpdatePlugin_ScheduledJobsDetectedMode(t *testing.T) {
 	p := NewUpdatePlugin()
 	p.autoSecurity = true
@@ -373,5 +490,27 @@ func TestUpdatePlugin_ScheduledJobsDetectedMode(t *testing.T) {
 	}
 	if jobs[0].ID != "update.full" {
 		t.Errorf("expected update.full, got %q", jobs[0].ID)
+	}
+}
+
+func TestUpdatePlugin_ConfigureTrimsWhitespace(t *testing.T) {
+	p := NewUpdatePlugin()
+	p.Configure(map[string]any{
+		"schedule": "  @daily  ",
+	})
+	cfg := p.CurrentConfig()
+	if cfg["schedule"] != "@daily" {
+		t.Errorf("Configure should trim whitespace: got %q", cfg["schedule"])
+	}
+}
+
+func TestUpdatePlugin_UpdateConfigTrimsWhitespace(t *testing.T) {
+	p := NewUpdatePlugin()
+	if err := p.UpdateConfig("schedule", " 0 5 * * * "); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cfg := p.CurrentConfig()
+	if cfg["schedule"] != "0 5 * * *" {
+		t.Errorf("UpdateConfig should trim whitespace: got %q", cfg["schedule"])
 	}
 }
