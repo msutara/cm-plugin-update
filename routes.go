@@ -73,6 +73,10 @@ func (h *handler) handleRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		if errors.Is(err, errAlreadyRunning) {
+			writeError(w, http.StatusConflict, "update already running", err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "update failed", err.Error())
 		return
 	}

@@ -3,6 +3,7 @@ package update
 import (
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/msutara/config-manager-core/plugin"
 )
@@ -26,7 +27,9 @@ const (
 // UpdatePlugin implements the plugin.Plugin interface for OS and package
 // update management on Debian-based nodes.
 type UpdatePlugin struct {
-	svc            *Service
+	svc *Service
+
+	mu             sync.RWMutex
 	schedule       string
 	autoSecurity   bool
 	securitySource string
@@ -61,17 +64,23 @@ func (p *UpdatePlugin) Routes() http.Handler {
 }
 
 func (p *UpdatePlugin) ScheduledJobs() []plugin.JobDefinition {
-	if !p.autoSecurity {
+	p.mu.RLock()
+	autoSec := p.autoSecurity
+	secSrc := p.securitySource
+	sched := p.schedule
+	p.mu.RUnlock()
+
+	if !autoSec {
 		return nil
 	}
-	if p.securitySource == "detected" && !p.svc.SecurityAvailable() {
+	if secSrc == "detected" && !p.svc.SecurityAvailable() {
 		return nil
 	}
 	return []plugin.JobDefinition{
 		{
 			ID:          "update.security",
 			Description: "Run automatic security updates",
-			Cron:        p.schedule,
+			Cron:        sched,
 			Func:        p.svc.RunSecurityUpdates,
 		},
 	}
@@ -91,6 +100,9 @@ func (p *UpdatePlugin) Configure(cfg map[string]any) {
 	if cfg == nil {
 		return
 	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	if v, ok := cfg["schedule"].(string); ok && v != "" {
 		p.schedule = v
 	}
@@ -104,6 +116,9 @@ func (p *UpdatePlugin) Configure(cfg map[string]any) {
 
 // UpdateConfig validates and applies a single runtime config change.
 func (p *UpdatePlugin) UpdateConfig(key string, value any) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	switch key {
 	case "schedule":
 		v, ok := value.(string)
@@ -134,6 +149,9 @@ func (p *UpdatePlugin) UpdateConfig(key string, value any) error {
 
 // CurrentConfig returns the plugin's current configuration.
 func (p *UpdatePlugin) CurrentConfig() map[string]any {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
 	return map[string]any{
 		"schedule":        p.schedule,
 		"auto_security":   p.autoSecurity,
