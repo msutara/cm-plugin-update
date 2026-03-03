@@ -114,8 +114,13 @@ func (p *UpdatePlugin) Endpoints() []plugin.Endpoint {
 
 // cronShortcuts are the standard @-shortcuts accepted by the core scheduler.
 var cronShortcuts = map[string]bool{
-	"@yearly": true, "@annually": true, "@monthly": true,
-	"@weekly": true, "@daily": true, "@midnight": true, "@hourly": true,
+	"@yearly":    true,
+	"@annually":  true,
+	"@monthly":   true,
+	"@weekly":    true,
+	"@daily":     true,
+	"@midnight":  true,
+	"@hourly":    true,
 }
 
 // validateCronExpr checks that expr is a valid cron expression structurally.
