@@ -17,7 +17,7 @@ var (
 const (
 	DefaultSchedule       = "0 3 * * *"
 	DefaultAutoSecurity   = true
-	DefaultSecuritySource = "available"
+	DefaultSecuritySource = "detected"
 )
 
 // Note: Registration with the core is handled externally — the core's main.go
@@ -64,7 +64,7 @@ func (p *UpdatePlugin) ScheduledJobs() []plugin.JobDefinition {
 	if !p.autoSecurity {
 		return nil
 	}
-	if p.securitySource == "available" && !p.svc.SecurityAvailable() {
+	if p.securitySource == "detected" && !p.svc.SecurityAvailable() {
 		return nil
 	}
 	return []plugin.JobDefinition{
@@ -97,7 +97,7 @@ func (p *UpdatePlugin) Configure(cfg map[string]any) {
 	if v, ok := cfg["auto_security"].(bool); ok {
 		p.autoSecurity = v
 	}
-	if v, ok := cfg["security_source"].(string); ok && (v == "available" || v == "always") {
+	if v, ok := cfg["security_source"].(string); ok && (v == "detected" || v == "always") {
 		p.securitySource = v
 	}
 }
@@ -122,8 +122,8 @@ func (p *UpdatePlugin) UpdateConfig(key string, value any) error {
 		if !ok || v == "" {
 			return fmt.Errorf("security_source must be a non-empty string")
 		}
-		if v != "available" && v != "always" {
-			return fmt.Errorf("security_source must be 'available' or 'always'")
+		if v != "detected" && v != "always" {
+			return fmt.Errorf("security_source must be 'detected' or 'always'")
 		}
 		p.securitySource = v
 	default:
