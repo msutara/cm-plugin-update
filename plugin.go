@@ -70,20 +70,35 @@ func (p *UpdatePlugin) ScheduledJobs() []plugin.JobDefinition {
 	sched := p.schedule
 	p.mu.RUnlock()
 
-	if !autoSec {
-		return nil
-	}
-	if secSrc == "detected" && !p.svc.SecurityAvailable() {
-		return nil
-	}
-	return []plugin.JobDefinition{
+	// update.full is always available for manual triggering (no cron).
+	jobs := []plugin.JobDefinition{
 		{
-			ID:          "update.security",
-			Description: "Run automatic security updates",
-			Cron:        sched,
-			Func:        p.svc.RunSecurityUpdates,
+			ID:          "update.full",
+			Description: "Run full system upgrade",
+			Func:        p.svc.RunFullUpgrade,
 		},
 	}
+
+	// update.security is included when security_source="always" (regardless of
+	// detection) or when security_source="detected" and the system actually has
+	// a security apt source.  The cron schedule is attached only when
+	// auto_security is enabled; otherwise the job is manual-trigger-only.
+	secAvail := p.svc.SecurityAvailable()
+	if secSrc == "detected" && !secAvail {
+		return jobs
+	}
+
+	secJob := plugin.JobDefinition{
+		ID:          "update.security",
+		Description: "Run security updates",
+		Func:        p.svc.RunSecurityUpdates,
+	}
+	if autoSec {
+		secJob.Cron = sched
+	}
+	jobs = append(jobs, secJob)
+
+	return jobs
 }
 
 func (p *UpdatePlugin) Endpoints() []plugin.Endpoint {

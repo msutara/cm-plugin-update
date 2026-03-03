@@ -64,7 +64,14 @@ curl http://localhost:7788/api/v1/plugins/update/config
 
 | Job ID            | Default Schedule | Description                    |
 |-------------------|------------------|--------------------------------|
-| update.security   | `0 3 * * *`     | Run automatic security updates |
+| update.full       | *(none)*         | Run full system upgrade        |
+| update.security   | `0 3 * * *`     | Run security updates           |
+
+> `update.full` is always available for manual triggering via the jobs API.
+>
+> `update.security` is registered when the security source is available
+> (see `security_source` config). The cron schedule is attached only when
+> `auto_security` is enabled.
 
 ## 5. Configuration
 
