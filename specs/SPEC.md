@@ -88,11 +88,17 @@ Errors follow the core convention:
 
 | Job ID            | Default Schedule | Description                    |
 |-------------------|------------------|--------------------------------|
-| update.security   | `0 3 * * *`     | Run automatic security updates |
+| update.full       | *(none)*         | Run full system upgrade        |
+| update.security   | `0 3 * * *`     | Run security updates           |
 
-> The security job is only registered when `auto_security` is enabled. When
-> `security_source` is `"detected"`, the job requires a separate security apt
-> source (e.g. Debian). When set to `"always"`, the job runs regardless.
+> `update.full` is always registered with no cron schedule (manual trigger
+> only via the jobs API).
+>
+> `update.security` is registered when the security source is available:
+> when `security_source` is `"detected"`, the system must have a separate
+> security apt source (e.g. Debian); when set to `"always"`, the job is
+> registered regardless. The cron schedule is attached only when
+> `auto_security` is enabled; otherwise the job is manual-trigger-only.
 
 ## 7. Configuration
 

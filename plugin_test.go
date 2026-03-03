@@ -15,6 +15,16 @@ var (
 	_ plugin.Configurable = (*UpdatePlugin)(nil)
 )
 
+// findJob returns the job with the given ID, or nil if not found.
+func findJob(jobs []plugin.JobDefinition, id string) *plugin.JobDefinition {
+	for i := range jobs {
+		if jobs[i].ID == id {
+			return &jobs[i]
+		}
+	}
+	return nil
+}
+
 func TestNewUpdatePlugin(t *testing.T) {
 	p := NewUpdatePlugin()
 	if p == nil {
@@ -93,31 +103,30 @@ func TestUpdatePlugin_ScheduledJobs(t *testing.T) {
 	p := NewUpdatePlugin()
 	jobs := p.ScheduledJobs()
 
-	if !p.svc.SecurityAvailable() {
-		// On non-Linux or systems without a security apt source, the
-		// security cron job is omitted.
-		if len(jobs) != 0 {
-			t.Fatalf("ScheduledJobs: expected empty when security unavailable, got %d", len(jobs))
+	// update.full is always present.
+	full := findJob(jobs, "update.full")
+	if full == nil {
+		t.Fatal("ScheduledJobs should always include update.full")
+	}
+	if full.Cron != "" {
+		t.Errorf("update.full should have empty cron (manual only), got %q", full.Cron)
+	}
+	if full.Func == nil {
+		t.Error("update.full Func is nil")
+	}
+
+	if p.svc.SecurityAvailable() {
+		// On Linux with security source, update.security should also be present.
+		sec := findJob(jobs, "update.security")
+		if sec == nil {
+			t.Fatal("expected update.security when security available")
 		}
-		return
-	}
-
-	if len(jobs) == 0 {
-		t.Fatal("ScheduledJobs returned empty slice")
-	}
-
-	job := jobs[0]
-	if job.ID == "" {
-		t.Error("job ID is empty")
-	}
-	if job.Description == "" {
-		t.Error("job Description is empty")
-	}
-	if job.Cron == "" {
-		t.Error("job Cron is empty")
-	}
-	if job.Func == nil {
-		t.Error("job Func is nil")
+		if sec.Cron == "" {
+			t.Error("update.security should have cron when auto_security=true (default)")
+		}
+		if sec.Func == nil {
+			t.Error("update.security Func is nil")
+		}
 	}
 }
 
@@ -305,11 +314,12 @@ func TestUpdatePlugin_ScheduledJobsUsesConfigSchedule(t *testing.T) {
 	p.securitySource = "always"
 
 	jobs := p.ScheduledJobs()
-	if len(jobs) == 0 {
-		t.Fatal("expected at least one job")
+	sec := findJob(jobs, "update.security")
+	if sec == nil {
+		t.Fatal("update.security job not found in scheduled jobs")
 	}
-	if jobs[0].Cron != "0 22 * * 5" {
-		t.Errorf("job cron: got %q, want %q", jobs[0].Cron, "0 22 * * 5")
+	if sec.Cron != "0 22 * * 5" {
+		t.Errorf("security job cron: got %q, want %q", sec.Cron, "0 22 * * 5")
 	}
 }
 
@@ -319,8 +329,16 @@ func TestUpdatePlugin_ScheduledJobsDisabledWhenAutoSecurityFalse(t *testing.T) {
 	p.svc = newTestService(true)
 
 	jobs := p.ScheduledJobs()
-	if len(jobs) != 0 {
-		t.Errorf("expected no jobs when auto_security=false, got %d", len(jobs))
+	// update.full always present; update.security present but without cron.
+	full := findJob(jobs, "update.full")
+	if full == nil {
+		t.Error("expected update.full job to be present")
+	}
+	sec := findJob(jobs, "update.security")
+	if sec == nil {
+		t.Error("expected update.security job to be present (unscheduled with empty cron)")
+	} else if sec.Cron != "" {
+		t.Error("update.security should have no cron when auto_security=false")
 	}
 }
 
@@ -331,8 +349,11 @@ func TestUpdatePlugin_ScheduledJobsAlwaysMode(t *testing.T) {
 	p.svc = newTestService(false)
 
 	jobs := p.ScheduledJobs()
-	if len(jobs) == 0 {
-		t.Fatal("securitySource=always should schedule even when SecurityAvailable()=false")
+	if findJob(jobs, "update.full") == nil {
+		t.Error("expected update.full job to be present")
+	}
+	if findJob(jobs, "update.security") == nil {
+		t.Fatal("securitySource=always should include update.security even when SecurityAvailable()=false")
 	}
 }
 
@@ -343,7 +364,14 @@ func TestUpdatePlugin_ScheduledJobsDetectedMode(t *testing.T) {
 	p.svc = newTestService(false)
 
 	jobs := p.ScheduledJobs()
-	if len(jobs) != 0 {
-		t.Errorf("securitySource=detected should skip when SecurityAvailable()=false, got %d", len(jobs))
+	// update.full always present; update.security omitted when detected + unavailable.
+	if findJob(jobs, "update.full") == nil {
+		t.Error("expected update.full job to be present")
+	}
+	if findJob(jobs, "update.security") != nil {
+		t.Error("securitySource=detected should omit update.security when SecurityAvailable()=false")
+	}
+	if jobs[0].ID != "update.full" {
+		t.Errorf("expected update.full, got %q", jobs[0].ID)
 	}
 }
