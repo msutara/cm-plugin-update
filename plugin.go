@@ -1,3 +1,5 @@
+// Package update implements the Config Manager update plugin for managing
+// OS and package updates on headless Debian-based nodes.
 package update
 
 import (

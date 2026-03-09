@@ -1,0 +1,14 @@
+# Go binaries
+*.exe
+*.test
+*.out
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*~
+
+# Coverage
+coverage.out
+coverage.html
