@@ -18,6 +18,9 @@ var (
 	_ plugin.Configurable = (*UpdatePlugin)(nil)
 )
 
+// version is set at build time via ldflags in the core binary build.
+var version = "dev"
+
 // Default configuration values.
 const (
 	DefaultSchedule       = "0 3 * * *"
@@ -56,7 +59,7 @@ func (p *UpdatePlugin) Name() string {
 }
 
 func (p *UpdatePlugin) Version() string {
-	return "0.4.4"
+	return version
 }
 
 func (p *UpdatePlugin) Description() string {
